@@ -87,7 +87,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15), // Bo góc
                     ),
-                    child: PostCard(post: posts[index]),
+                    child: PostCard(post: posts[index], onPostDeleted: () { setState(() {
+                      _initializePostStream(); // Tái tạo Stream để fetch lại dữ liệu mới nhất
+                    }); },),
                   ),
                 );
                 // <<< KẾT THÚC CẬP NHẬT >>>

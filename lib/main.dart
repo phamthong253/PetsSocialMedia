@@ -8,6 +8,7 @@ import 'package:quanlythucung/features/4_pet/screens/my_pet_detail_screen.dart';
 import 'package:quanlythucung/features/4_pet/screens/add_my_pet_screen.dart';
 import 'package:quanlythucung/features/4_pet/screens/edit_pet_screen.dart';
 import 'package:quanlythucung/features/5_post/presentation/screens/add_post_screen.dart';
+import 'package:quanlythucung/features/5_post/presentation/screens/detail_post_screen.dart';
 import 'package:quanlythucung/features/5_post/presentation/screens/edit_post_screen.dart';
 import 'package:quanlythucung/features/main_layout.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -71,11 +72,22 @@ class MyApp extends StatelessWidget {
         },
         '/add_pet': (_) => const AddEditPetScreen(),
         '/edit_pet': (context) {
-          final pet = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          final pet =
+              ModalRoute.of(context)!.settings.arguments
+                  as Map<String, dynamic>;
           return EditPetScreen(pet: pet);
         },
+        '/detail_post': (context) {
+          // Lấy dữ liệu bài đăng được truyền từ PostCard
+          final post =
+              ModalRoute.of(context)!.settings.arguments
+                  as Map<String, dynamic>;
+          // Trả về màn hình DetailPostScreen và truyền dữ liệu vào
+          return DetailPostScreen(post: post);
+        },
+        'default': (_) =>
+            const Scaffold(body: Center(child: Text('Không tìm thấy trang'))),
       },
-
     );
   }
 }
