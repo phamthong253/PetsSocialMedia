@@ -169,8 +169,9 @@ class _MyPetsScreenState extends State<MyPetsScreen> {
                 ],
               ),
             ),
-            Image.network(
-              'assets/pets-image/cat4.png', // Ảnh mèo nền trong suốt
+            // --- SỬA LỖI Ở ĐÂY: Thay Image.network bằng Image.asset ---
+            Image.asset(
+              'asset/pets-image/cat4.png', // Đảm bảo đường dẫn này khớp với pubspec.yaml
               height: 140,
             )
           ],
@@ -234,7 +235,7 @@ class _MyPetsScreenState extends State<MyPetsScreen> {
                   _selectedCategory = selected ? index : -1;
                 });
               },
-              backgroundColor: Colors.black12.withOpacity(0.05),
+              backgroundColor: Colors.grey.shade100,
               selectedColor: buttonColor,
               labelStyle: TextStyle(
                 color: _selectedCategory == index ? Colors.white : black,

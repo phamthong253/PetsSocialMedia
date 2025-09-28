@@ -6,6 +6,7 @@ import 'package:quanlythucung/features/3_profile/screens/profile_detail_screen.d
 import 'package:quanlythucung/features/4_pet/screens/add_edit_event_pet_screen.dart';
 import 'package:quanlythucung/features/4_pet/screens/my_pet_detail_screen.dart';
 import 'package:quanlythucung/features/4_pet/screens/add_my_pet_screen.dart';
+import 'package:quanlythucung/features/4_pet/screens/edit_pet_screen.dart';
 import 'package:quanlythucung/features/5_post/presentation/screens/add_post_screen.dart';
 import 'package:quanlythucung/features/5_post/presentation/screens/edit_post_screen.dart';
 import 'package:quanlythucung/features/main_layout.dart';
@@ -69,7 +70,12 @@ class MyApp extends StatelessWidget {
           return AddEditEventScreen(petId: petId);
         },
         '/add_pet': (_) => const AddEditPetScreen(),
+        '/edit_pet': (context) {
+          final pet = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return EditPetScreen(pet: pet);
+        },
       },
+
     );
   }
 }

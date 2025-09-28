@@ -73,6 +73,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
       });
 
       _showSnackBar('Đăng bài thành công!');
+      // Trả về `true` để báo hiệu cho màn hình trước đó biết đã đăng bài thành công
       Navigator.pop(context, true);
     } catch (e) {
       _showSnackBar('Lỗi đăng bài: ${e.toString()}');
@@ -103,33 +104,33 @@ class _AddPostScreenState extends State<AddPostScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    TextFormField(
-                      controller: _contentController,
-                      decoration: const InputDecoration(
-                        hintText: 'Bạn đang nghĩ gì?',
-                        border: InputBorder.none,
-                      ),
-                      maxLines: 5,
-                      validator: (value) => null,
-                    ),
-                    formSpacer,
-                    if (_image != null)
-                      Image.file(_image!, fit: BoxFit.contain),
-                    formSpacer,
-                    OutlinedButton.icon(
-                      onPressed: _pickImage,
-                      icon: const Icon(Icons.image),
-                      label: const Text('Chọn ảnh'),
-                    ),
-                  ],
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _contentController,
+                decoration: const InputDecoration(
+                  hintText: 'Bạn đang nghĩ gì?',
+                  border: InputBorder.none,
                 ),
+                maxLines: 5,
+                validator: (value) => null,
               ),
-            ),
+              formSpacer,
+              if (_image != null)
+                Image.file(_image!, fit: BoxFit.contain),
+              formSpacer,
+              OutlinedButton.icon(
+                onPressed: _pickImage,
+                icon: const Icon(Icons.image),
+                label: const Text('Chọn ảnh'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

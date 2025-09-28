@@ -3,6 +3,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:quanlythucung/main.dart';
 import 'package:quanlythucung/core/utils/utils.dart';
 
+// Đây là một hằng số giả định cho khoảng cách (formSpacer),
+// vì nó không được định nghĩa trong file bạn cung cấp.
+const formSpacer = SizedBox(height: 20);
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -81,43 +85,68 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
+                  // --- TÊN (Cập nhật validation) ---
                   TextFormField(
                     controller: _nameController,
-                    decoration: const InputDecoration(labelText: 'Tên'),
+                    decoration: const InputDecoration(labelText: 'Tên hiển thị'),
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
+                      if (value == null || value.trim().isEmpty) {
                         return 'Vui lòng nhập tên của bạn';
                       }
+                      if (value.trim().length < 2) {
+                        return 'Tên phải có ít nhất 2 ký tự';
+                      }
+
+                      // *** QUY TẮC MỚI: Cấm ký tự đặc biệt ***
+                      final nameRegex = RegExp(r'^[a-zA-Z0-9\s]+$');
+                      if (!nameRegex.hasMatch(value.trim())) {
+                        return 'Tên không được chứa ký tự đặc biệt';
+                      }
+
                       return null;
                     },
                   ),
                   formSpacer,
+                  // --- EMAIL ---
                   TextFormField(
                     controller: _emailController,
                     decoration: const InputDecoration(labelText: 'Email'),
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
-                      if (value == null ||
-                          value.isEmpty ||
-                          !value.contains('@')) {
-                        return 'Vui lòng nhập email hợp lệ';
+                      if (value == null || value.isEmpty) {
+                        return 'Vui lòng nhập địa chỉ email';
+                      }
+                      final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                      if (!emailRegex.hasMatch(value)) {
+                        return 'Địa chỉ email không hợp lệ';
                       }
                       return null;
                     },
                   ),
                   formSpacer,
+                  // --- MẬT KHẨU ---
                   TextFormField(
                     controller: _passwordController,
                     decoration: const InputDecoration(labelText: 'Mật khẩu'),
                     obscureText: true,
                     validator: (value) {
-                      if (value == null || value.isEmpty || value.length < 6) {
-                        return 'Mật khẩu phải có ít nhất 6 ký tự';
+                      if (value == null || value.isEmpty) {
+                        return 'Vui lòng nhập mật khẩu';
+                      }
+                      if (value.length < 8) {
+                        return 'Mật khẩu phải có ít nhất 8 ký tự';
+                      }
+                      if (!value.contains(RegExp(r'[0-9]'))) {
+                        return 'Mật khẩu cần ít nhất 1 chữ số';
+                      }
+                      if (!value.contains(RegExp(r'[A-Z]'))) {
+                        return 'Mật khẩu cần ít nhất 1 chữ cái in hoa';
                       }
                       return null;
                     },
                   ),
                   formSpacer,
+                  // --- NHẬP LẠI MẬT KHẨU ---
                   TextFormField(
                     controller: _rePasswordController,
                     decoration: const InputDecoration(
@@ -125,8 +154,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     obscureText: true,
                     validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Vui lòng nhập lại mật khẩu';
+                      }
                       if (value != _passwordController.text) {
-                        return 'Mật khẩu không khớp';
+                        return 'Mật khẩu xác nhận không khớp';
                       }
                       return null;
                     },
@@ -135,9 +167,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : ElevatedButton(
-                          onPressed: _signUp,
-                          child: const Text('Đăng ký'),
-                        ),
+                    onPressed: _signUp,
+                    child: const Text('Đăng ký'),
+                  ),
                   formSpacer,
                   TextButton(
                     onPressed: () {

@@ -2,12 +2,13 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:quanlythucung/main.dart';
 
 class AddEditPetScreen extends StatefulWidget {
-  // Trong tương lai, chúng ta có thể truyền pet vào đây để chỉnh sửa
-  // final Map<String, dynamic>? pet;
-  const AddEditPetScreen({super.key});
+  // Thêm tham số pet: null cho Add, có dữ liệu cho Edit
+  final Map<String, dynamic>? pet;
+  const AddEditPetScreen({super.key, this.pet}); // Cập nhật constructor
 
   @override
   State<AddEditPetScreen> createState() => _AddEditPetScreenState();
@@ -17,15 +18,38 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
-  // Controllers cho các trường dựa trên model Cat
   final _nameController = TextEditingController();
   final _ageController = TextEditingController();
   final _weightController = TextEditingController();
   final _locationController = TextEditingController();
   final _descriptionController = TextEditingController();
 
-  String? _selectedSex = 'Đực'; // Giá trị mặc định
+  String? _selectedSex;
+  String? _selectedVaccinationStatus; // <<< TRƯỜNG MỚI
   XFile? _imageFile;
+  String? _existingImageUrl;
+
+  bool get isEditing => widget.pet != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (isEditing) {
+      // Khởi tạo giá trị khi chỉnh sửa
+      _nameController.text = widget.pet!['name'] ?? '';
+      _ageController.text = widget.pet!['age']?.toString() ?? '';
+      _weightController.text = widget.pet!['weight']?.toString() ?? '';
+      _locationController.text = widget.pet!['location'] ?? '';
+      _descriptionController.text = widget.pet!['introduction'] ?? '';
+      _selectedSex = widget.pet!['gender'];
+      _existingImageUrl = widget.pet!['image_url'];
+      _selectedVaccinationStatus = widget.pet!['vaccination_status'] ?? 'Chưa tiêm chủng'; // Lấy dữ liệu cũ
+    } else {
+      // Giá trị mặc định khi thêm mới
+      _selectedSex = 'Đực';
+      _selectedVaccinationStatus = 'Chưa tiêm chủng';
+    }
+  }
 
   @override
   void dispose() {
@@ -62,7 +86,7 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
       return;
     }
 
-    if (_imageFile == null) {
+    if (!isEditing && _imageFile == null) {
       _showSnackBar('Vui lòng chọn ảnh cho thú cưng.', isError: true);
       return;
     }
@@ -70,24 +94,29 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
     setState(() => _isLoading = true);
 
     try {
-      String? imageUrl;
-      // 1. Upload ảnh
-      final userId = supabase.auth.currentUser!.id;
-      final imageExtension = _imageFile!.path.split('.').last.toLowerCase();
-      final imagePath = '$userId/pets/${DateTime.now().millisecondsSinceEpoch}.$imageExtension';
+      String? imageUrl = _existingImageUrl;
 
-      if (kIsWeb) {
-        final imageBytes = await _imageFile!.readAsBytes();
-        await supabase.storage.from('pet_images').uploadBinary(imagePath, imageBytes);
-      } else {
-        final file = File(_imageFile!.path);
-        await supabase.storage.from('pet_images').upload(imagePath, file);
+      if (_imageFile != null) {
+        final userId = supabase.auth.currentUser!.id;
+        final imageExtension = _imageFile!.path.split('.').last.toLowerCase();
+
+        // Sử dụng ID thú cưng hoặc timestamp cho đường dẫn
+        final petIdentifier = isEditing ? widget.pet!['id'] : DateTime.now().millisecondsSinceEpoch;
+        final imagePath = '$userId/pets/$petIdentifier.$imageExtension';
+
+        if (kIsWeb) {
+          final imageBytes = await _imageFile!.readAsBytes();
+          await supabase.storage.from('pet_images').uploadBinary(imagePath, imageBytes, fileOptions: const FileOptions(upsert: true));
+        } else {
+          final file = File(_imageFile!.path);
+          await supabase.storage.from('pet_images').upload(imagePath, file, fileOptions: const FileOptions(upsert: true));
+        }
+        imageUrl = supabase.storage.from('pet_images').getPublicUrl(imagePath);
       }
-      imageUrl = supabase.storage.from('pet_images').getPublicUrl(imagePath);
 
-      // 2. Thêm dữ liệu vào bảng 'pets'
-      await supabase.from('pets').insert({
-        'owner_id': userId,
+      // Chuẩn bị dữ liệu
+      final petData = {
+        'owner_id': supabase.auth.currentUser!.id,
         'name': _nameController.text,
         'gender': _selectedSex,
         'age': double.tryParse(_ageController.text) ?? 0.0,
@@ -95,10 +124,26 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
         'location': _locationController.text,
         'introduction': _descriptionController.text,
         'image_url': imageUrl,
-      });
+        'vaccination_status': _selectedVaccinationStatus, // <<< TRƯỜNG MỚI
+      };
 
-      _showSnackBar('Thêm thú cưng thành công!');
-      Navigator.pop(context, true); // Trả về true để màn hình trước làm mới
+      if (isEditing) {
+        // CHẾ ĐỘ CHỈNH SỬA (UPDATE)
+        final petId = widget.pet!['id'];
+        await supabase.from('pets').update(petData).eq('id', petId);
+        _showSnackBar('Cập nhật thú cưng thành công!');
+
+        final updatedPet = await supabase.from('pets').select().eq('id', petId).single();
+        Navigator.pop(context, updatedPet);
+      } else {
+        // CHẾ ĐỘ THÊM MỚI (INSERT)
+        await supabase.from('pets').insert(petData);
+        _showSnackBar('Thêm thú cưng thành công!');
+        Navigator.pop(context, true);
+      }
+
+    } on PostgrestException catch (e) {
+      _showSnackBar('Lỗi cơ sở dữ liệu: ${e.message}', isError: true);
     } catch (e) {
       _showSnackBar('Đã xảy ra lỗi: ${e.toString()}', isError: true);
     } finally {
@@ -110,9 +155,11 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final title = isEditing ? 'Chỉnh sửa thú cưng' : 'Thêm thú cưng mới';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Thêm thú cưng mới'),
+        title: Text(title),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -134,7 +181,7 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.grey),
                   ),
-                  child: _imageFile == null
+                  child: (_imageFile == null && _existingImageUrl == null)
                       ? const Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -145,9 +192,11 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
                   )
                       : ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: kIsWeb
+                    child: _imageFile != null
+                        ? (kIsWeb
                         ? Image.network(_imageFile!.path, fit: BoxFit.cover)
-                        : Image.file(File(_imageFile!.path), fit: BoxFit.cover),
+                        : Image.file(File(_imageFile!.path), fit: BoxFit.cover))
+                        : Image.network(_existingImageUrl!, fit: BoxFit.cover),
                   ),
                 ),
               ),
@@ -198,6 +247,27 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
                 decoration: const InputDecoration(labelText: 'Giới tính'),
               ),
               const SizedBox(height: 16),
+
+              // <<< TRƯỜNG LỰA CHỌN TIÊM CHỦNG MỚI
+              DropdownButtonFormField<String>(
+                value: _selectedVaccinationStatus,
+                items: ['Đã tiêm chủng', 'Chưa tiêm chủng']
+                    .map((label) => DropdownMenuItem(
+                  child: Text(label),
+                  value: label,
+                ))
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedVaccinationStatus = value;
+                  });
+                },
+                decoration: const InputDecoration(labelText: 'Trạng thái tiêm chủng'),
+                validator: (value) => value == null ? 'Vui lòng chọn trạng thái tiêm chủng' : null,
+              ),
+              const SizedBox(height: 16),
+              // <<< KẾT THÚC TRƯỜNG LỰA CHỌN TIÊM CHỦNG
+
               TextFormField(
                 controller: _locationController,
                 decoration: const InputDecoration(labelText: 'Địa chỉ'),
@@ -219,7 +289,7 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: const Text('Thêm thú cưng'),
+                child: Text(isEditing ? 'Lưu thay đổi' : 'Thêm thú cưng'),
               ),
             ],
           ),
@@ -228,4 +298,3 @@ class _AddEditPetScreenState extends State<AddEditPetScreen> {
     );
   }
 }
-

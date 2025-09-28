@@ -5,6 +5,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:quanlythucung/main.dart';
 import 'package:quanlythucung/core/utils/utils.dart';
 
+// ĐÃ KHAI BÁO THÊM formSpacer ĐỂ TRÁNH LỖI BIẾN KHÔNG ĐƯỢC ĐỊNH NGHĨA
+const formSpacer = SizedBox(height: 20);
+
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -92,13 +95,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           await supabase.storage
               .from('avatars')
               .upload(
-                path,
-                imageFile,
-                fileOptions: const FileOptions(
-                  cacheControl: '3600',
-                  upsert: true,
-                ),
-              );
+            path,
+            imageFile,
+            fileOptions: const FileOptions(
+              cacheControl: '3600',
+              upsert: true,
+            ),
+          );
           // Lấy URL công khai của ảnh vừa tải lên
           newAvatarUrl = supabase.storage.from('avatars').getPublicUrl(path);
         }
@@ -107,14 +110,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         await supabase
             .from('profiles')
             .update({
-              'name': _nameController.text.trim(),
-              'phone': _phoneController.text.trim(),
-              'hobbies': _hobbiesController.text.trim(),
-              'avatar_url':
-                  newAvatarUrl ??
-                  _avatarUrl, // Dùng URL mới, nếu không thì giữ lại URL cũ
-              'updated_at': DateTime.now().toIso8601String(),
-            })
+          'name': _nameController.text.trim(),
+          'phone': _phoneController.text.trim(),
+          'hobbies': _hobbiesController.text.trim(),
+          'avatar_url':
+          newAvatarUrl ??
+              _avatarUrl, // Dùng URL mới, nếu không thì giữ lại URL cũ
+          'updated_at': DateTime.now().toIso8601String(),
+        })
             .eq('id', userId);
 
         if (mounted) {
@@ -151,72 +154,87 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(16.0),
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            Center(
+              child: Stack(
                 children: [
-                  Center(
-                    child: Stack(
-                      children: [
-                        CircleAvatar(
-                          radius: 60,
-                          backgroundImage: _selectedImage != null
-                              ? FileImage(File(_selectedImage!.path))
-                              : (_avatarUrl != null
-                                        ? NetworkImage(_avatarUrl!)
-                                        : null)
-                                    as ImageProvider?,
-                          child: _avatarUrl == null && _selectedImage == null
-                              ? const Icon(Icons.person, size: 60)
-                              : null,
+                  CircleAvatar(
+                    radius: 60,
+                    backgroundImage: _selectedImage != null
+                        ? FileImage(File(_selectedImage!.path))
+                        : (_avatarUrl != null
+                        ? NetworkImage(_avatarUrl!)
+                        : null)
+                    as ImageProvider?,
+                    child: _avatarUrl == null && _selectedImage == null
+                        ? const Icon(Icons.person, size: 60)
+                        : null,
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.grey[200],
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.camera_alt,
+                          color: Colors.black,
                         ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: CircleAvatar(
-                            backgroundColor: Colors.grey[200],
-                            child: IconButton(
-                              icon: const Icon(
-                                Icons.camera_alt,
-                                color: Colors.black,
-                              ),
-                              onPressed: _pickImage,
-                            ),
-                          ),
-                        ),
-                      ],
+                        onPressed: _pickImage,
+                      ),
                     ),
                   ),
-                  formSpacer,
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(labelText: 'Tên'),
-                    validator: (value) =>
-                        value!.isEmpty ? 'Tên không được để trống' : null,
-                  ),
-                  formSpacer,
-                  TextFormField(
-                    controller: _phoneController,
-                    decoration: const InputDecoration(
-                      labelText: 'Số điện thoại',
-                    ),
-                    keyboardType: TextInputType.phone,
-                  ),
-                  formSpacer,
-                  TextFormField(
-                    controller: _hobbiesController,
-                    decoration: const InputDecoration(labelText: 'Sở thích'),
-                  ),
-                  formSpacer,
-                  _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : ElevatedButton(
-                          onPressed: _updateProfile,
-                          child: const Text('Lưu thay đổi'),
-                        ),
                 ],
               ),
             ),
+            formSpacer,
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Tên'),
+              // --- VALIDATION TÊN ĐÃ CẬP NHẬT ---
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Tên không được để trống';
+                }
+                if (value.trim().length < 2) {
+                  return 'Tên phải có ít nhất 2 ký tự';
+                }
+
+                // Regex: Chỉ cho phép chữ cái, chữ số và khoảng trắng
+                final nameRegex = RegExp(r'^[a-zA-Z0-9\s]+$');
+                if (!nameRegex.hasMatch(value.trim())) {
+                  return 'Tên không được chứa ký tự đặc biệt';
+                }
+
+                return null;
+              },
+            ),
+            formSpacer,
+            TextFormField(
+              controller: _phoneController,
+              decoration: const InputDecoration(
+                labelText: 'Số điện thoại',
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+            formSpacer,
+            TextFormField(
+              controller: _hobbiesController,
+              decoration: const InputDecoration(labelText: 'Sở thích'),
+            ),
+            formSpacer,
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : ElevatedButton(
+              onPressed: _updateProfile,
+              child: const Text('Lưu thay đổi'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
