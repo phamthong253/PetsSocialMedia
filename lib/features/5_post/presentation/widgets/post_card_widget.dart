@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:quanlythucung/core/utils/utils.dart';
+// Giả định file này chứa showDeleteConfirmationDialog
 import 'package:quanlythucung/features/5_post/data/models/delete_post.dart';
+// Giả định file này chứa navigateToEditPostScreen
 import 'package:quanlythucung/features/5_post/data/models/edit_post.dart';
 import 'package:quanlythucung/main.dart';
 
@@ -15,7 +17,6 @@ String _formatTimestamp(String? timestamp) {
   if (timestamp == null) return 'Không rõ thời gian';
   try {
     final dateTime = DateTime.parse(timestamp);
-    // Sử dụng logic formatTimeAgo đã được cung cấp trước đó
     final now = DateTime.now();
     final difference = now.difference(dateTime);
 
@@ -49,7 +50,7 @@ class PostCard extends StatefulWidget {
 class _PostCardState extends State<PostCard> {
   bool _isLiked = false;
   int _currentLikeCount = 0;
-  int _currentCommentCount = 0; // <<< BIẾN STATE MỚI CHO COMMENT COUNT
+  int _currentCommentCount = 0;
   String? _currentUserId;
 
   @override
@@ -57,7 +58,7 @@ class _PostCardState extends State<PostCard> {
     super.initState();
     _currentUserId = supabase.auth.currentUser?.id;
     _currentLikeCount = widget.post['like_count'] ?? 0;
-    _currentCommentCount = widget.post['comment_count'] ?? 0; // <<< KHỞI TẠO
+    _currentCommentCount = widget.post['comment_count'] ?? 0;
     _checkIfLiked();
   }
 
@@ -77,7 +78,7 @@ class _PostCardState extends State<PostCard> {
         });
       }
     } catch (e) {
-      // Bỏ qua lỗi ở đây
+      // Bỏ qua lỗi
     }
   }
 
@@ -97,7 +98,7 @@ class _PostCardState extends State<PostCard> {
         });
       }
     } catch (e) {
-      // Bỏ qua lỗi ở đây
+      // Bỏ qua lỗi
     }
   }
 
@@ -111,7 +112,6 @@ class _PostCardState extends State<PostCard> {
         );
       return;
     }
-
     // Cập nhật UI ngay lập tức (Optimistic Update)
     setState(() {
       _isLiked = !_isLiked;
@@ -131,8 +131,6 @@ class _PostCardState extends State<PostCard> {
             .eq('post_id', widget.post['id'])
             .eq('user_id', _currentUserId!);
       }
-      // Không cần fetch lại ở đây vì chỉ cần update like count
-
     } catch (e) {
       // Nếu có lỗi từ Supabase, hoàn tác lại trạng thái UI và hiển thị lỗi
       if (mounted) {
@@ -142,6 +140,34 @@ class _PostCardState extends State<PostCard> {
         });
         showErrorSnackBar(context, 'Lỗi cập nhật lượt thích: $e');
       }
+    }
+  }
+
+  // <<< HÀM ĐIỀU HƯỚNG ĐẾN THÔNG TIN THÚ CƯNG CỦA TÁC GIẢ >>>
+  void _navigateToAuthorPets() {
+    final authorId = widget.post['author_id'] as String?;
+    final authorName = widget.post['author_name'] as String? ?? 'Người dùng';
+
+    // Kiểm tra nếu tác giả là người dùng hiện tại thì không điều hướng
+    if (authorId == null || authorId == _currentUserId) return;
+
+    Navigator.pushNamed(
+      context,
+      '/user_pets', // Giả định bạn đã đăng ký route này
+      arguments: {
+        'authorId': authorId,
+        'authorName': authorName,
+      },
+    );
+  }
+  // <<< KẾT THÚC HÀM ĐIỀU HƯỚNG >>>
+
+  // Hàm để cập nhật số lượng bình luận (được gọi từ DetailPostScreen)
+  void updateCommentCount(int newCount) {
+    if (mounted) {
+      setState(() {
+        _currentCommentCount = newCount;
+      });
     }
   }
 
@@ -156,10 +182,7 @@ class _PostCardState extends State<PostCard> {
     final content = widget.post['content'] as String? ?? '';
     final imageUrl = widget.post['image_url'] as String?;
 
-    // (DEBUG print code đã được xóa để code gọn hơn)
-
     return Card(
-      // Màu nền trắng và loại bỏ margin cũ
       color: Colors.white,
       margin: EdgeInsets.zero,
       elevation: 2,
@@ -167,65 +190,72 @@ class _PostCardState extends State<PostCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ListTile(
-            leading: CircleAvatar(
-              backgroundImage: _isValidUrl(authorAvatarUrl)
-                  ? NetworkImage(authorAvatarUrl!)
-                  : null,
-              child: !_isValidUrl(authorAvatarUrl)
-                  ? const Icon(Icons.person, size: 24, color: Colors.grey)
-                  : null,
-            ),
-            title: Text(
-              authorName,
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-            ),
-            subtitle: Text(
-              createdAt,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-            trailing: isAuthor
-                ? PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: Colors.black),
-              onSelected: (value) async {
-                if (value == 'edit') {
-                  navigateToEditPostScreen(context, widget.post);
-                } else if (value == 'delete') {
-                  await showDeleteConfirmationDialog(
-                    context,
-                    widget.post['id'].toString(),
-                    imageUrl,
-                        () { if (widget.onPostDeleted != null) {
-    widget.onPostDeleted!();}},
-                  );
-                }
-              },
-              itemBuilder: (BuildContext context) =>
-              <PopupMenuEntry<String>>[
-                const PopupMenuItem<String>(
-                  value: 'edit',
-                  child: ListTile(
-                    leading: Icon(Icons.edit_outlined),
-                    title: Text('Chỉnh sửa'),
-                  ),
-                ),
-                const PopupMenuItem<String>(
-                  value: 'delete',
-                  child: ListTile(
-                    leading: Icon(
-                      Icons.delete_outline,
-                      color: Colors.red,
-                    ),
-                    title: Text(
-                      'Xóa',
-                      style: TextStyle(color: Colors.red),
+          // Bọc ListTile bằng GestureDetector để xử lý sự kiện click
+          GestureDetector(
+            onTap: _navigateToAuthorPets, // Gọi hàm điều hướng
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundImage: _isValidUrl(authorAvatarUrl)
+                    ? NetworkImage(authorAvatarUrl!)
+                    : null,
+                child: !_isValidUrl(authorAvatarUrl)
+                    ? const Icon(Icons.person, size: 24, color: Colors.grey)
+                    : null,
+              ),
+              title: Text(
+                authorName,
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+              subtitle: Text(
+                createdAt,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              trailing: isAuthor
+                  ? PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: Colors.black),
+                onSelected: (value) async {
+                  if (value == 'edit') {
+                    navigateToEditPostScreen(context, widget.post);
+                  } else if (value == 'delete') {
+                    await showDeleteConfirmationDialog(
+                      context,
+                      widget.post['id'].toString(),
+                      imageUrl,
+                          () { if (widget.onPostDeleted != null) {
+                        widget.onPostDeleted!();
+                      }
+                      },
+                    );
+                  }
+                },
+                itemBuilder: (BuildContext context) =>
+                <PopupMenuEntry<String>>[
+                  const PopupMenuItem<String>(
+                    value: 'edit',
+                    child: ListTile(
+                      leading: Icon(Icons.edit_outlined),
+                      title: Text('Chỉnh sửa'),
                     ),
                   ),
-                ),
-              ],
-            )
-                : null,
+                  const PopupMenuItem<String>(
+                    value: 'delete',
+                    child: ListTile(
+                      leading: Icon(
+                        Icons.delete_outline,
+                        color: Colors.red,
+                      ),
+                      title: Text(
+                        'Xóa',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+                  : null,
+            ),
           ),
+          // Thân bài viết (Content và Image)
           if (content.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 8.0),
@@ -246,6 +276,8 @@ class _PostCardState extends State<PostCard> {
                 ),
               ),
             ),
+
+          // Footer (Like/Comment)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: Row(
@@ -274,7 +306,7 @@ class _PostCardState extends State<PostCard> {
                       '/detail_post',
                       arguments: widget.post,
                     ).then((_) {
-                      // <<< CẬP NHẬT COMMENT COUNT KHI QUAY LẠI >>>
+                      // Cập nhật số comment khi quay lại
                       _refreshPostData();
                     });
                   },
@@ -288,7 +320,6 @@ class _PostCardState extends State<PostCard> {
                       children: [
                         const Icon(Icons.comment_outlined, color: Colors.grey),
                         const SizedBox(width: 8),
-                        // <<< HIỂN THỊ SỐ COMMENT TỪ BIẾN STATE >>>
                         Text(
                             _currentCommentCount.toString(),
                             style: const TextStyle(color: Colors.black)

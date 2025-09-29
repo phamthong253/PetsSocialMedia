@@ -23,48 +23,83 @@ class PetDetailScreen extends StatefulWidget {
 class _PetDetailScreenState extends State<PetDetailScreen> {
   Map<String, dynamic> _currentPet = {};
   late final Stream<List<Map<String, dynamic>>> _eventsStream;
+
+  // Biến state để lưu tên chủ sở hữu
   String _ownerName = 'Chủ sở hữu';
+
+  // Biến kiểm tra quyền sở hữu
+  bool _isMyPet = false;
 
   @override
   void initState() {
     super.initState();
     _currentPet = widget.pet;
 
-    final user = supabase.auth.currentUser;
-    if (user != null && user.userMetadata != null) {
-      _ownerName = user.userMetadata!['name'] ?? 'Chủ sở hữu';
-    }
+    final currentUserId = supabase.auth.currentUser?.id;
+    final petOwnerId = widget.pet['owner_id']; // Lấy ID chủ sở hữu thú cưng
 
-    _eventsStream = supabase
-        .from('pet_events')
-        .stream(primaryKey: ['id'])
-        .eq('pet_id', widget.pet['id'])
-        .order('event_time', ascending: true);
+    _isMyPet = currentUserId != null && currentUserId == petOwnerId;
+
+    // Nếu là thú cưng của mình hoặc của người khác, ta vẫn lấy tên của chủ sở hữu
+    _fetchOwnerName(petOwnerId);
+
+    // Stream chỉ được tạo nếu là thú cưng của mình để tránh fetch lịch hẹn của người khác
+    if (_isMyPet) {
+      _eventsStream = supabase
+          .from('pet_events')
+          .stream(primaryKey: ['id'])
+          .eq('pet_id', widget.pet['id'])
+          .order('event_time', ascending: true);
+    } else {
+      // Tạo stream rỗng nếu không phải thú cưng của mình
+      _eventsStream = const Stream.empty();
+    }
   }
 
-  // Phương thức navigateToEditScreen đã bị xóa do yêu cầu xóa nút Edit
+  // <<< HÀM MỚI: LẤY TÊN CHỦ SỞ HỮU BẤT KỂ LÀ AI >>>
+  Future<void> _fetchOwnerName(String? ownerId) async {
+    if (ownerId == null) return;
+    try {
+      final data = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', ownerId)
+          .single();
+      if (mounted) {
+        setState(() {
+          _ownerName = data['name'] ?? 'Chủ sở hữu ẩn danh';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _ownerName = 'Không tìm thấy tên';
+        });
+      }
+    }
+  }
+  // <<< KẾT THÚC HÀM MỚI >>>
+
 
   @override
   Widget build(BuildContext context) {
     Size size = MediaQuery.of(context).size;
 
     return Scaffold(
-      // ĐẶT MÀU NỀN CỦA SCAFFOLD LÀ MÀU TRẮNG
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(
           _currentPet['name'] ?? 'Chi tiết thú cưng',
-          style: const TextStyle(color: Colors.black), // Đặt màu chữ cho AppBar
+          style: const TextStyle(color: Colors.black),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_rounded, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        // XÓA BỎ NÚT CHỈNH SỬA (ICON BÚT CHÌ) BẰNG CÁCH KHÔNG ĐỊNH NGHĨA 'actions'
+        // KHÔNG CÓ ACTIONS (Không có nút Edit)
         actions: const [],
-        // ĐẶT MÀU NỀN CỦA APPBAR LÀ MÀU TRẮNG
         backgroundColor: Colors.white,
-        elevation: 0, // Xóa bỏ bóng dưới AppBar
+        elevation: 0,
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -72,7 +107,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- 1. Ảnh thú cưng (Nằm trực tiếp trong body) ---
+              // --- 1. Ảnh thú cưng ---
               Center(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(15),
@@ -97,7 +132,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
 
               const SizedBox(height: 20),
 
-              // --- 4. Thông tin Chủ ---
+              // --- 4. Thông tin Chủ (SỬ DỤNG TÊN ĐÃ FETCH) ---
               _buildOwnerInfo(),
 
               const SizedBox(height: 20),
@@ -107,15 +142,18 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
 
               const SizedBox(height: 20),
 
-              // --- 6. Lịch hẹn sắp tới ---
-              _buildEventsSection(),
-
-              const SizedBox(height: 20),
-
-              // --- 7. Nút hành động chính ---
-              _buildActionButton(),
-
-              const SizedBox(height: 20),
+              // --- 6. Lịch hẹn sắp tới (CHỈ HIỂN THỊ NẾU LÀ THÚ CƯNG CỦA MÌNH) ---
+              if (_isMyPet) ...[
+                _buildEventsSection(),
+                const SizedBox(height: 20),
+                // --- 7. Nút hành động chính (CHỈ HIỂN THỊ NẾU LÀ THÚ CƯNG CỦA MÌNH) ---
+                _buildActionButton(),
+                const SizedBox(height: 20),
+              ] else ...[
+                // Nút liên hệ/Chat với chủ sở hữu (Tùy chọn)
+                _buildContactButton(),
+                const SizedBox(height: 20),
+              ],
             ],
           ),
         ),
@@ -123,9 +161,8 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
     );
   }
 
-  // --- HÀM HỖ TRỢ ĐÃ ĐƯỢC ĐỊNH NGHĨA LẠI ---
+  // --- HÀM HỖ TRỢ (GIỮ NGUYÊN) ---
 
-  // Tên và Vị trí (Không có nút Edit)
   Widget _buildNameAndLocation() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,7 +191,6 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
     );
   }
 
-  // Hàng thông tin chi tiết
   Widget _buildPetInfoRow() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -181,7 +217,6 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
     );
   }
 
-  // Box thông tin chi tiết
   Widget _buildMoreInfoBox(Color pawColor, Color backgroundColr, String title, String value) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
@@ -229,7 +264,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
     );
   }
 
-  // Thông tin Chủ (WonerInfo)
+  // Thông tin Chủ (WonerInfo) - ĐÃ CẬP NHẬT
   Widget _buildOwnerInfo() {
     return Row(
       children: [
@@ -244,20 +279,21 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _ownerName,
+                _ownerName, // Hiển thị tên đã fetch
                 style: const TextStyle(
                   fontSize: 18,
                   color: Colors.black,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const Text(
-                "Chủ sở hữu thú cưng",
-                style: TextStyle(fontSize: 14, color: Colors.black54),
+              Text(
+                _isMyPet ? "Bạn là chủ sở hữu" : "Chủ sở hữu thú cưng",
+                style: const TextStyle(fontSize: 14, color: Colors.black54),
               ),
             ],
           ),
         ),
+        // Nút Chat/Liên hệ (Giữ lại để người khác có thể liên hệ)
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
@@ -284,9 +320,9 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
         const Text(
           "Giới thiệu",
           style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black54
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black54
           ),
         ),
         const SizedBox(height: 8),
@@ -302,7 +338,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
     );
   }
 
-  // Lịch hẹn và Nút hành động
+  // Lịch hẹn (CHỈ GỌI KHI LÀ THÚ CƯNG CỦA MÌNH)
   Widget _buildEventsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,6 +383,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
     );
   }
 
+  // Nút Hành động (CHỈ GỌI KHI LÀ THÚ CƯNG CỦA MÌNH)
   Widget _buildActionButton() {
     return Container(
       height: 60,
@@ -367,6 +404,34 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
           icon: const Icon(Icons.add_circle, color: Colors.white),
           label: const Text(
             'Thêm sự kiện',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Nút liên hệ thay thế khi xem thú cưng của người khác
+  Widget _buildContactButton() {
+    return Container(
+      height: 60,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(25),
+        color: petAccentColor,
+      ),
+      child: Center(
+        child: TextButton.icon(
+          onPressed: () {
+            // TODO: Triển khai chức năng Chat hoặc liên hệ
+          },
+          icon: const Icon(Icons.message, color: Colors.white),
+          label: const Text(
+            'Liên hệ Chủ sở hữu',
             style: TextStyle(
               fontSize: 18,
               color: Colors.white,

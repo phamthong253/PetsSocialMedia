@@ -10,6 +10,7 @@ import 'package:quanlythucung/features/4_pet/screens/edit_pet_screen.dart';
 import 'package:quanlythucung/features/5_post/presentation/screens/add_post_screen.dart';
 import 'package:quanlythucung/features/5_post/presentation/screens/detail_post_screen.dart';
 import 'package:quanlythucung/features/5_post/presentation/screens/edit_post_screen.dart';
+import 'package:quanlythucung/features/5_post/presentation/screens/user_pets_screen.dart';
 import 'package:quanlythucung/features/main_layout.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -84,6 +85,14 @@ class MyApp extends StatelessWidget {
                   as Map<String, dynamic>;
           // Trả về màn hình DetailPostScreen và truyền dữ liệu vào
           return DetailPostScreen(post: post);
+        },
+        '/user_pets': (context) {
+          // Nếu bạn dùng pushNamed thay vì MaterialPageRoute trực tiếp
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return UserPetsScreen(
+            authorId: args['authorId'] as String,
+            authorName: args['authorName'] as String,
+          );
         },
         'default': (_) =>
             const Scaffold(body: Center(child: Text('Không tìm thấy trang'))),
