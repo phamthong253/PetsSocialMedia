@@ -44,22 +44,31 @@ class PostCard extends StatefulWidget {
   const PostCard({super.key, required this.post, required this.onPostDeleted});
 
   @override
-  State<PostCard> createState() => _PostCardState();
+  // <<< SỬA LỖI 1: ĐỔI TÊN LỚP STATE THÀNH PUBLIC >>>
+  State<PostCard> createState() => PostCardState();
 }
 
-class _PostCardState extends State<PostCard> {
+// <<< SỬA LỖI 1: ĐỔI TÊN LỚP STATE THÀNH PUBLIC >>>
+class PostCardState extends State<PostCard> {
   bool _isLiked = false;
   int _currentLikeCount = 0;
   int _currentCommentCount = 0;
-  String? _currentUserId;
+
+  // <<< FIX LỖI LOOKUP FAILED: KHỞI TẠO BIẾN TRỰC TIẾP >>>
+  // Lấy ID người dùng ngay lập tức, tránh lỗi truy cập sớm trước initState
+  final String? _currentUserId = supabase.auth.currentUser?.id;
+  // <<< KẾT THÚC FIX >>>
 
   @override
   void initState() {
     super.initState();
-    _currentUserId = supabase.auth.currentUser?.id;
+    // Bỏ dòng gán _currentUserId ở đây vì đã gán final ở trên
     _currentLikeCount = widget.post['like_count'] ?? 0;
     _currentCommentCount = widget.post['comment_count'] ?? 0;
-    _checkIfLiked();
+
+    if (_currentUserId != null) {
+      _checkIfLiked();
+    }
   }
 
   // Hàm kiểm tra xem người dùng hiện tại đã like bài đăng này chưa
@@ -143,7 +152,7 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
-  // <<< HÀM ĐIỀU HƯỚNG ĐẾN THÔNG TIN THÚ CƯNG CỦA TÁC GIẢ >>>
+  // HÀM ĐIỀU HƯỚNG ĐẾN THÔNG TIN THÚ CƯNG CỦA TÁC GIẢ
   void _navigateToAuthorPets() {
     final authorId = widget.post['author_id'] as String?;
     final authorName = widget.post['author_name'] as String? ?? 'Người dùng';
@@ -160,9 +169,8 @@ class _PostCardState extends State<PostCard> {
       },
     );
   }
-  // <<< KẾT THÚC HÀM ĐIỀU HƯỚNG >>>
 
-  // Hàm để cập nhật số lượng bình luận (được gọi từ DetailPostScreen)
+  // <<< PHƯƠNG THỨC PUBLIC ĐỂ CẬP NHẬT COMMENT COUNT (Dùng cho GlobalKey) >>>
   void updateCommentCount(int newCount) {
     if (mounted) {
       setState(() {
@@ -170,6 +178,7 @@ class _PostCardState extends State<PostCard> {
       });
     }
   }
+  // <<< KẾT THÚC PHƯƠNG THỨC PUBLIC >>>
 
   @override
   Widget build(BuildContext context) {

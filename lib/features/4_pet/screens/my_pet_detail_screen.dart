@@ -25,7 +25,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
   late final Stream<List<Map<String, dynamic>>> _eventsStream;
 
   String _ownerName = 'Chủ sở hữu';
-  String? _ownerPhone; // <<< BIẾN MỚI CHO SỐ ĐIỆN THOẠI
+  String? _ownerPhone;
   bool _isMyPet = false;
 
   @override
@@ -38,7 +38,6 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
 
     _isMyPet = currentUserId != null && currentUserId == petOwnerId;
 
-    // CẬP NHẬT: Fetch cả tên và số điện thoại
     _fetchOwnerInfo(petOwnerId);
 
     if (_isMyPet) {
@@ -52,19 +51,18 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
     }
   }
 
-  // <<< HÀM CẬP NHẬT: FETCH TÊN VÀ SỐ ĐIỆN THOẠI >>>
   Future<void> _fetchOwnerInfo(String? ownerId) async {
     if (ownerId == null) return;
     try {
       final data = await supabase
           .from('profiles')
-          .select('name, phone') // SELECT CẢ PHONE
+          .select('name, phone')
           .eq('id', ownerId)
           .single();
       if (mounted) {
         setState(() {
           _ownerName = data['name'] ?? 'Chủ sở hữu ẩn danh';
-          _ownerPhone = data['phone']; // GÁN SỐ ĐIỆN THOẠI
+          _ownerPhone = data['phone'];
         });
       }
     } catch (e) {
@@ -76,22 +74,24 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
       }
     }
   }
-  // <<< KẾT THÚC HÀM FETCH INFO >>>
 
-  // <<< HÀM MỚI: HIỂN THỊ POPUP SỐ ĐIỆN THOẠI >>>
   void _showContactDialog(BuildContext context) {
+    String title;
     String message;
+
     if (_ownerPhone != null && _ownerPhone!.isNotEmpty) {
+      title = 'Thông tin liên hệ';
       message = "Số điện thoại của $_ownerName:\n\n${_ownerPhone!}";
     } else {
-      message = "$_ownerName chưa cung cấp số điện thoại hoặc thông tin bị ẩn.";
+      title = 'Không thể liên hệ';
+      message = "$_ownerName chưa cung cấp số điện thoại công khai, hoặc thông tin này đã bị ẩn.";
     }
 
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('Thông tin liên hệ'),
+          title: Text(title),
           content: Text(
             message,
             textAlign: TextAlign.center,
@@ -104,7 +104,6 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
               },
               child: const Text('Đóng'),
             ),
-            // Bạn có thể thêm nút Call/Copy ở đây
             if (_ownerPhone != null && _ownerPhone!.isNotEmpty)
               TextButton(
                 onPressed: () {
@@ -118,7 +117,25 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
       },
     );
   }
-  // <<< KẾT THÚC HÀM POPUP >>>
+
+  // <<< HÀM ĐIỀU HƯỚNG SANG MÀN HÌNH CHỈNH SỬA >>>
+  Future<void> _navigateToEditScreen() async {
+    final result = await Navigator.pushNamed(
+      context,
+      '/edit_pet', // Giả định route này đã được định nghĩa
+      arguments: _currentPet,
+    );
+
+    // Nếu kết quả trả về là Map (dữ liệu pet đã cập nhật), refresh UI
+    if (result is Map<String, dynamic>) {
+      setState(() {
+        _currentPet = result;
+        // Có thể cần refresh lại stream sự kiện nếu thông tin pet thay đổi
+        // Tùy thuộc vào logic của bạn.
+      });
+    }
+  }
+  // <<< KẾT THÚC HÀM ĐIỀU HƯỚNG >>>
 
   @override
   Widget build(BuildContext context) {
@@ -135,7 +152,15 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
           icon: const Icon(Icons.arrow_back_ios_rounded, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: const [],
+        // <<< THÊM NÚT CHỈNH SỬA CHO CHỦ SỞ HỮU >>>
+        actions: [
+          if (_isMyPet)
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.black),
+              onPressed: _navigateToEditScreen,
+            ),
+        ],
+        // <<< KẾT THÚC THÊM NÚT >>>
         backgroundColor: Colors.white,
         elevation: 0,
       ),
@@ -192,13 +217,22 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          _currentPet['name'] ?? 'Pet Name',
-          style: const TextStyle(
-            fontSize: 25,
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
+        Row( // Thêm Row để hiển thị nút Edit nếu là pet của mình
+          children: [
+            Expanded(
+              child: Text(
+                _currentPet['name'] ?? 'Pet Name',
+                style: const TextStyle(
+                  fontSize: 25,
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            // TÙY CHỌN: Nếu bạn muốn nút Edit ở Body thay vì AppBar, dùng đoạn này:
+            // if (_isMyPet)
+            //   IconButton(icon: const Icon(Icons.edit, color: Colors.black), onPressed: _navigateToEditScreen),
+          ],
         ),
         Row(
           children: [
@@ -436,7 +470,6 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
     );
   }
 
-  // Nút liên hệ thay thế khi xem thú cưng của người khác
   Widget _buildContactButton() {
     return Container(
       height: 60,
@@ -447,9 +480,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> {
       ),
       child: Center(
         child: TextButton.icon(
-          // <<< GÁN HÀM HIỂN THỊ POPUP VÀO ONPRESSED >>>
           onPressed: () => _showContactDialog(context),
-          // <<< KẾT THÚC GÁN HÀM >>>
           icon: const Icon(Icons.phone, color: Colors.white),
           label: const Text(
             'Liên hệ Chủ sở hữu',
